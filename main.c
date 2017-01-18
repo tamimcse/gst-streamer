@@ -75,7 +75,7 @@ main (int   argc,
     g_printerr ("Cannot create source.\n");
     return -1;
   }
-  g_object_set (src, "pattern", "snow", NULL);
+  g_object_set (src, "pattern", 1, NULL); //"snow"=1
   g_object_set (src, "num-buffers", 1800, NULL);
   
   //create filter
@@ -116,11 +116,11 @@ main (int   argc,
   } 
 
   /* we add all elements into the pipeline */
-  gst_bin_add_many (GST_BIN (pipeline), src, filter, sink, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), src, filter, enc, svr, NULL);
 
   /* we link the elements together */
 //  gst_element_link (src, filter);
-  if(!gst_element_link_many (src, filter, sink, NULL))
+  if(!gst_element_link_many (src, filter, enc, svr, NULL))
   {
     g_printerr ("Cannot link elements.\n");
     return -1;            
