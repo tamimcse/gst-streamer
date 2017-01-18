@@ -1,1 +1,1 @@
-# gst-streamer
+Gstreamer client for streaming video
