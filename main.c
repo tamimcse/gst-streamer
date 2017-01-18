@@ -130,11 +130,11 @@ main (int   argc,
   } 
 
   /* we add all elements into the pipeline */
-  gst_bin_add_many (GST_BIN (pipeline), src, filter, enc, parser, dec, sink, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), src, filter, enc, svr, NULL);
 
   /* we link the elements together */
 //  gst_element_link (src, filter);
-  if(!gst_element_link_many (src, filter, enc, parser, dec, sink, NULL))
+  if(!gst_element_link_many (src, filter, enc, svr, NULL))
   {
     g_printerr ("Cannot link elements.\n");
     return -1;            
