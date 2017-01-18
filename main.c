@@ -45,7 +45,7 @@ main (int   argc,
 {
   GMainLoop *loop;
 
-  GstElement *pipeline, *src, *filter, *enc, *svr, *sink;
+  GstElement *pipeline, *src, *filter, *enc, *parser, *dec, *svr, *sink;
   GstBus *bus;
   guint bus_watch_id;
   GstCaps *filtercaps;
@@ -100,6 +100,20 @@ main (int   argc,
   }  
   g_object_set (enc, "bitrate", 512, NULL);
 
+  //Create x264 parser
+  parser = gst_element_factory_make ("h264parse", "parser");
+  if (!parser) {
+    g_printerr ("Cannot create an x264 parser.\n");
+    return -1;
+  }    
+
+  //Create x264 decoder
+  dec = gst_element_factory_make ("avdec_h264", "dec");
+  if (!dec) {
+    g_printerr ("Cannot create an x264 decoder.\n");
+    return -1;
+  }    
+  
   //Create TCP server sink
   svr = gst_element_factory_make ("tcpserversink", "svr");
   if (!svr) {
@@ -109,18 +123,18 @@ main (int   argc,
   g_object_set (svr, "host", argv[1], NULL);        
   g_object_set (svr, "port", 8554, NULL);    
   
-  sink = gst_element_factory_make ("ximagesink", "sink");
+  sink = gst_element_factory_make ("xvimagesink", "sink");
   if (!sink) {
     g_printerr ("Cannot create sink.\n");
     return -1;
   } 
 
   /* we add all elements into the pipeline */
-  gst_bin_add_many (GST_BIN (pipeline), src, filter, enc, svr, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), src, filter, enc, parser, dec, sink, NULL);
 
   /* we link the elements together */
 //  gst_element_link (src, filter);
-  if(!gst_element_link_many (src, filter, enc, svr, NULL))
+  if(!gst_element_link_many (src, filter, enc, parser, dec, sink, NULL))
   {
     g_printerr ("Cannot link elements.\n");
     return -1;            
