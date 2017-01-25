@@ -9,7 +9,7 @@ bus_call (GstBus     *bus,
 {
   GMainLoop *loop = (GMainLoop *) data;
 
-  g_print ("Received a message!!!!!!!\n");
+    g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (msg));
   
   switch (GST_MESSAGE_TYPE (msg)) {
 
@@ -17,6 +17,10 @@ bus_call (GstBus     *bus,
       g_print ("End of stream\n");
       g_main_loop_quit (loop);
       break;
+      
+    case GST_MESSAGE_BUFFERING:
+        g_print("Buffering...");
+        break;
 
     case GST_MESSAGE_ERROR: {
       gchar  *debug;
