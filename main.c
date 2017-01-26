@@ -7,25 +7,9 @@ typedef struct _CustomData {
   gboolean is_live;  
   GstElement *pipeline;
   GMainLoop *loop;
+  GstElement *tcp_svr_sink;
 } CustomData;
 
-static gdouble period = 0.0;
-
-static void
-do_step (GstElement * bin)
-{
-  gdouble rate;
-
-  rate = sin (period);
-
-  period += M_PI / 150;
-
-  rate += 1.2;
-
-  gst_element_send_event (bin,
-      gst_event_new_step (GST_FORMAT_TIME, 40 * GST_MSECOND, rate, FALSE,
-          FALSE));
-}
 
 //static gboolean
 //bus_call (GstBus     *bus,
@@ -70,14 +54,12 @@ do_step (GstElement * bin)
 static void
 handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
 {
-  GstElement *bin = data->pipeline;
   GMainLoop *loop = data->loop;
   
   g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (message));
 
   switch (message->type) {
     case GST_MESSAGE_STEP_DONE:
-      do_step (bin);
       break;
     case GST_MESSAGE_EOS:
       g_print ("End of stream\n");
@@ -124,6 +106,7 @@ handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
 }
 
 static gboolean background_task (CustomData *data) {
+//    struct GstTCPServerSink *tcp_svr = (struct GstTCPServerSink *)data->tcp_svr_sink;
     g_print("In Backbround task \n");
     return TRUE;
 }
@@ -159,13 +142,7 @@ main (int   argc,
     g_printerr ("Cannot create pipeline.\n");
     return -1;
   }
-  
-  
-  /* Initialize our data structure */
-  memset (&data, 0, sizeof (data));
-  data.loop = loop;
-  data.pipeline = pipeline;
-    
+      
   //create source element 
   src = gst_element_factory_make ("videotestsrc", "src");
   if (!src) {
@@ -244,10 +221,13 @@ main (int   argc,
 //  bus_watch_id = gst_bus_add_watch (bus, bus_call, loop);
 //  g_signal_connect (bus, "message", (GCallback) bus_call, bin);
   g_signal_connect (bus, "sync-message", (GCallback) handle_sync_message, &data);
-
   
-    /* queue step */
-  do_step (pipeline);
+
+    /* Initialize our data structure */
+  memset (&data, 0, sizeof (data));
+  data.loop = loop;
+  data.pipeline = pipeline;
+  data.tcp_svr_sink = svr;
   
   /* Set the pipeline to "playing" state*/
   g_print ("Now playing: %s\n", argv[1]);
