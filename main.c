@@ -1,18 +1,83 @@
 #include <gst/gst.h>
 #include <glib.h>
+#include <math.h>
+#include <string.h>
 
+typedef struct _CustomData {
+  GstElement *pipeline;
+  GMainLoop *loop;
+} CustomData;
 
-static gboolean
-bus_call (GstBus     *bus,
-          GstMessage *msg,
-          gpointer    data)
+static gdouble period = 0.0;
+
+static void
+do_step (GstElement * bin)
 {
-  GMainLoop *loop = (GMainLoop *) data;
+  gdouble rate;
 
-    g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (msg));
+  rate = sin (period);
+
+  period += M_PI / 150;
+
+  rate += 1.2;
+
+  gst_element_send_event (bin,
+      gst_event_new_step (GST_FORMAT_TIME, 40 * GST_MSECOND, rate, FALSE,
+          FALSE));
+}
+
+//static gboolean
+//bus_call (GstBus     *bus,
+//          GstMessage *msg,
+//          gpointer    data)
+//{
+//  GMainLoop *loop = (GMainLoop *) data;
+//
+//    g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (msg));
+//  
+//  switch (GST_MESSAGE_TYPE (msg)) {
+//
+//    case GST_MESSAGE_EOS:
+//      g_print ("End of stream\n");
+//      g_main_loop_quit (loop);
+//      break;
+//      
+//    case GST_MESSAGE_BUFFERING:
+//        g_print("Buffering...");
+//        break;
+//
+//    case GST_MESSAGE_ERROR: {
+//      gchar  *debug;
+//      GError *error;
+//
+//      gst_message_parse_error (msg, &error, &debug);
+//      g_free (debug);
+//
+//      g_printerr ("Error: %s\n", error->message);
+//      g_error_free (error);
+//
+//      g_main_loop_quit (loop);
+//      break;
+//    }
+//    default:
+//      break;
+//  }
+//
+//  return TRUE;
+//}
+
+static void
+handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
+{
+  GstElement *bin = data->pipeline;
+  GMainLoop *loop = data->loop;
   
-  switch (GST_MESSAGE_TYPE (msg)) {
+  g_print ("Got %s message\n", GST_MESSAGE_TYPE_NAME (message));
 
+  switch (message->type) {
+    case GST_MESSAGE_STEP_DONE:
+      do_step (bin);
+      break;
     case GST_MESSAGE_EOS:
       g_print ("End of stream\n");
       g_main_loop_quit (loop);
@@ -26,7 +91,7 @@ bus_call (GstBus     *bus,
       gchar  *debug;
       GError *error;
 
-      gst_message_parse_error (msg, &error, &debug);
+      gst_message_parse_error (message, &error, &debug);
       g_free (debug);
 
       g_printerr ("Error: %s\n", error->message);
@@ -38,8 +103,6 @@ bus_call (GstBus     *bus,
     default:
       break;
   }
-
-  return TRUE;
 }
 
 
@@ -48,15 +111,17 @@ main (int   argc,
       char *argv[])
 {
   GMainLoop *loop;
+  CustomData data;
 
   GstElement *pipeline, *src, *filter, *enc, *parser, *dec, *svr, *sink;
   GstBus *bus;
-  guint bus_watch_id;
+//  guint bus_watch_id;
   GstCaps *filtercaps;
 
   /* Initialisation */
   gst_init (&argc, &argv);
-
+  
+  
   loop = g_main_loop_new (NULL, FALSE);
 
   /* Check input arguments */
@@ -72,6 +137,11 @@ main (int   argc,
     return -1;
   }
   
+  
+  /* Initialize our data structure */
+  memset (&data, 0, sizeof (data));
+  data.loop = loop;
+  data.pipeline = pipeline;
     
   //create source element 
   src = gst_element_factory_make ("videotestsrc", "src");
@@ -146,9 +216,15 @@ main (int   argc,
 
   /* we add a message handler */
   bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
-  bus_watch_id = gst_bus_add_watch (bus, bus_call, loop);
-  gst_object_unref (bus);
+  gst_bus_add_signal_watch (bus);
+  gst_bus_enable_sync_message_emission (bus);
+//  bus_watch_id = gst_bus_add_watch (bus, bus_call, loop);
+//  g_signal_connect (bus, "message", (GCallback) bus_call, bin);
+  g_signal_connect (bus, "sync-message", (GCallback) handle_sync_message, &data);
+
   
+    /* queue step */
+  do_step (pipeline);
   
   /* Set the pipeline to "playing" state*/
   g_print ("Now playing: %s\n", argv[1]);
@@ -159,14 +235,14 @@ main (int   argc,
   g_print ("Running...\n");
   g_main_loop_run (loop);
 
-
   /* Out of the main loop, clean up nicely */
   g_print ("Returned, stopping playback\n");
   gst_element_set_state (pipeline, GST_STATE_NULL);
 
   g_print ("Deleting pipeline\n");
   gst_object_unref (GST_OBJECT (pipeline));
-  g_source_remove (bus_watch_id);
+  gst_object_unref (bus);
+//  g_source_remove (bus_watch_id);
   g_main_loop_unref (loop);
 
   return 0;
