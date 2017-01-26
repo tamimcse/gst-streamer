@@ -4,6 +4,7 @@
 #include <string.h>
 
 typedef struct _CustomData {
+  gboolean is_live;  
   GstElement *pipeline;
   GMainLoop *loop;
 } CustomData;
@@ -83,9 +84,21 @@ handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
       g_main_loop_quit (loop);
       break;
       
-    case GST_MESSAGE_BUFFERING:
-        g_print("Buffering...");
-        break;
+    case GST_MESSAGE_BUFFERING:{
+      gint percent = 0;
+
+      /* If the stream is live, we do not care about buffering. */
+      if (data->is_live) break;
+
+      gst_message_parse_buffering (message, &percent);
+      g_print ("Buffering (%3d%%)\r", percent);
+      /* Wait until buffering is complete before start/resume playing */
+      if (percent < 100)
+        gst_element_set_state (data->pipeline, GST_STATE_PAUSED);
+      else
+        gst_element_set_state (data->pipeline, GST_STATE_PLAYING);
+      break;
+    }
 
     case GST_MESSAGE_ERROR: {
       gchar  *debug;
@@ -100,6 +113,11 @@ handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
       g_main_loop_quit (loop);
       break;
     }
+    case GST_MESSAGE_CLOCK_LOST:
+        /* Get a new clock */
+        gst_element_set_state (data->pipeline, GST_STATE_PAUSED);
+        gst_element_set_state (data->pipeline, GST_STATE_PLAYING);
+        break;    
     default:
       break;
   }
@@ -117,6 +135,7 @@ main (int   argc,
   GstBus *bus;
 //  guint bus_watch_id;
   GstCaps *filtercaps;
+  GstStateChangeReturn ret;
 
   /* Initialisation */
   gst_init (&argc, &argv);
@@ -228,7 +247,14 @@ main (int   argc,
   
   /* Set the pipeline to "playing" state*/
   g_print ("Now playing: %s\n", argv[1]);
-  gst_element_set_state (pipeline, GST_STATE_PLAYING);
+  ret = gst_element_set_state (pipeline, GST_STATE_PLAYING);
+  if (ret == GST_STATE_CHANGE_FAILURE) {
+    g_printerr ("Unable to set the pipeline to the playing state.\n");
+    gst_object_unref (pipeline);
+    return -1;
+  } else if (ret == GST_STATE_CHANGE_NO_PREROLL) {
+    data.is_live = TRUE;
+  }
 
 
   /* Iterate */
