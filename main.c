@@ -2,12 +2,19 @@
 #include <glib.h>
 #include <math.h>
 #include <string.h>
+#include <gio/gio.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <syslog.h>
+#include <sys/socket.h>  
+#include <netinet/tcp.h>  
 
 typedef struct _CustomData {
   gboolean is_live;  
   GstElement *pipeline;
   GMainLoop *loop;
   GstElement *tcp_svr_sink;
+  GSocket *socket;
 } CustomData;
 
 
@@ -105,9 +112,28 @@ handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
   }
 }
 
+void sock_added (GstElement *element,
+               GSocket *socket, CustomData *data){
+    data->socket = socket;
+//    FILE* log = fopen("logfile.log", "w");
+//    fprintf(log, "A different kind of Hello world ...!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+//    fclose(log);
+}
+
 static gboolean background_task (CustomData *data) {
-//    struct GstTCPServerSink *tcp_svr = (struct GstTCPServerSink *)data->tcp_svr_sink;
+    GSocket *socket = data->socket;
+    if(socket == NULL)
+        return FALSE;
     g_print("In Backbround task \n");
+    int fd = g_socket_get_fd(socket);
+    
+    struct tcp_info info;
+    int infoLen = sizeof(info);
+    getsockopt(fd, SOL_TCP, TCP_INFO, (void *)&info, (socklen_t *)&infoLen);
+//    FILE* log = fopen("logfile.log", "w");
+//    fprintf(log, "throughput = %u\n", info.tcpi_rtt);
+//    fclose(log);
+    
     return TRUE;
 }
 
@@ -221,6 +247,7 @@ main (int   argc,
 //  bus_watch_id = gst_bus_add_watch (bus, bus_call, loop);
 //  g_signal_connect (bus, "message", (GCallback) bus_call, bin);
   g_signal_connect (bus, "sync-message", (GCallback) handle_sync_message, &data);
+  g_signal_connect (svr, "client-added", (GCallback)sock_added, &data);
   
 
     /* Initialize our data structure */
