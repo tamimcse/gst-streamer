@@ -123,6 +123,10 @@ handle_sync_message (GstBus * bus, GstMessage * message, CustomData *data)
   }
 }
 
+static gboolean background_task (CustomData *data) {
+    g_print("In Backbround task \n");
+    return TRUE;
+}
 
 int
 main (int   argc,
@@ -256,6 +260,7 @@ main (int   argc,
     data.is_live = TRUE;
   }
 
+  g_timeout_add_seconds (1, (GSourceFunc)background_task, &data);
 
   /* Iterate */
   g_print ("Running...\n");
