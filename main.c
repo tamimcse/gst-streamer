@@ -7,13 +7,16 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/socket.h>  
-#include <netinet/tcp.h>  
+#include <netinet/tcp.h>
+#include <stdint.h>  
+//#include <linux/tcp.h>
 
 typedef struct _CustomData {
   gboolean is_live;  
   GstElement *pipeline;
   GMainLoop *loop;
   GstElement *tcp_svr_sink;
+  GstElement *encoder;
   GSocket *socket;
 } CustomData;
 
@@ -130,9 +133,12 @@ static gboolean background_task (CustomData *data) {
     struct tcp_info info;
     int infoLen = sizeof(info);
     getsockopt(fd, SOL_TCP, TCP_INFO, (void *)&info, (socklen_t *)&infoLen);
-//    FILE* log = fopen("logfile.log", "w");
-//    fprintf(log, "throughput = %u\n", info.tcpi_rtt);
-//    fclose(log);
+    uint64_t throughput = info.tcpi_snd_cwnd * info.tcpi_snd_mss/info.tcpi_rto;
+    FILE* log = fopen("logfile.log", "a");
+    fprintf(log, "throughput = %lu\n", throughput);
+    fclose(log);
+    
+    g_object_set (data->encoder, "bitrate", 100, NULL);
     
     return TRUE;
 }
@@ -255,6 +261,7 @@ main (int   argc,
   data.loop = loop;
   data.pipeline = pipeline;
   data.tcp_svr_sink = svr;
+  data.encoder = enc;
   
   /* Set the pipeline to "playing" state*/
   g_print ("Now playing: %s\n", argv[1]);
