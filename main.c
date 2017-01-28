@@ -7,9 +7,9 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/socket.h>  
-#include <netinet/tcp.h>
 #include <stdint.h>  
-//#include <linux/tcp.h>
+#include <linux/tcp.h>
+//#include <netinet/tcp.h>
 
 typedef struct _CustomData {
   gboolean is_live;  
@@ -129,13 +129,14 @@ static gboolean background_task (CustomData *data) {
     
     struct tcp_info info;
     int infoLen = sizeof(info);
-    getsockopt(fd, SOL_TCP, TCP_INFO, (void *)&info, (socklen_t *)&infoLen);
-    uint64_t throughput = info.tcpi_snd_cwnd * info.tcpi_snd_mss/info.tcpi_rto;
+    getsockopt(fd, 6, TCP_INFO, (void *)&info, (socklen_t *)&infoLen);
+//    uint64_t throughput = info.tcpi_snd_cwnd * info.tcpi_snd_mss * 8 /1024;
+    uint64_t throughput = info.tcpi_delivery_rate * 8 /1024;
     FILE* log = fopen("logfile.log", "a");
     fprintf(log, "throughput = %lu\n", throughput);
     fclose(log);
     
-    g_object_set (data->encoder, "bitrate", 100, NULL);
+    g_object_set (data->encoder, "bitrate", throughput, NULL);
     
     return TRUE;
 }
