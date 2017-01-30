@@ -202,7 +202,7 @@ main (int   argc,
     g_printerr ("Cannot create file source.\n");
     return -1;
   }
-  g_object_set (filesrc, "location", "/home/tamim/Linux/bbb.mp4", NULL);
+  g_object_set (filesrc, "location", "bbb.mp4", NULL);
   g_object_set (filesrc, "num-buffers", 1800, NULL);  
   
   //create filter
