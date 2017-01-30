@@ -17,9 +17,23 @@ typedef struct _CustomData {
   GMainLoop *loop;
   GstElement *tcp_svr_sink;
   GstElement *encoder;
+  GstElement *decodebin;
+  GstElement *source;
+  GstElement *video_converter;
   GSocket *socket;
 } CustomData;
 
+static void
+cb_new_pad (GstElement *element,
+        GstPad     *pad,
+        CustomData *data)
+{
+  g_print ("A new pad was created\n");    
+  if(!gst_element_link_many (data->decodebin, data->encoder, data->tcp_svr_sink, NULL))
+  {
+    g_printerr ("Cannot link elements.\n");          
+  }
+}
 
 static gboolean
 bus_call (GstBus     *bus,
@@ -148,8 +162,8 @@ main (int   argc,
   GMainLoop *loop;
   CustomData data;
 
-  GstElement *pipeline, *src, *filter, *enc, *parser, *dec, *svr, *sink;
-  GstBus *bus;
+  GstElement *pipeline, *src, *filesrc, *decbin, *vidconv, *filter, *enc, *parser, *dec, *svr, *sink;
+//  GstBus *bus;
 //  guint bus_watch_id;
   GstCaps *filtercaps;
   GstStateChangeReturn ret;
@@ -182,6 +196,15 @@ main (int   argc,
   g_object_set (src, "pattern", 1, NULL); //"snow"=1
   g_object_set (src, "num-buffers", 1800, NULL);
   
+  //create file source element 
+  filesrc = gst_element_factory_make ("filesrc", "filesrc");
+  if (!filesrc) {
+    g_printerr ("Cannot create file source.\n");
+    return -1;
+  }
+  g_object_set (filesrc, "location", "/home/tamim/Linux/bbb.mp4", NULL);
+  g_object_set (filesrc, "num-buffers", 1800, NULL);  
+  
   //create filter
   filter = gst_element_factory_make ("capsfilter", "filter");
   if (!filter) {
@@ -196,13 +219,25 @@ main (int   argc,
   g_object_set (filter, "caps", filtercaps, NULL);
   gst_caps_unref (filtercaps);
 
+  //Create decode bin and video convert
+  decbin = gst_element_factory_make ("decodebin", "decbin");
+  if (!decbin) {
+    g_printerr ("Cannot create decode bin.\n");
+    return -1;
+  }
+  vidconv = gst_element_factory_make ("videoconvert", "vidconv");
+  if (!vidconv) {
+    g_printerr ("Cannot create video convert.\n");
+    return -1;
+  }  
+  
   //Create x264 encoder
   enc = gst_element_factory_make ("x264enc", "enc");
   if (!enc) {
     g_printerr ("Cannot create an x264 encoder.\n");
     return -1;
   }  
-  g_object_set (enc, "bitrate", 512, NULL);
+  g_object_set (enc, "bitrate", 20, NULL);
 
   //Create x264 parser
   parser = gst_element_factory_make ("h264parse", "parser");
@@ -233,34 +268,38 @@ main (int   argc,
     return -1;
   } 
 
+  /* Initialize our data structure */
+  memset (&data, 0, sizeof (data));
+  data.loop = loop;
+  data.pipeline = pipeline;
+  data.source = filesrc;
+  data.tcp_svr_sink = svr;
+  data.encoder = enc;  
+  data.decodebin = decbin;
+  
   /* we add all elements into the pipeline */
-  gst_bin_add_many (GST_BIN (pipeline), src, filter, enc, svr, NULL);
+  gst_bin_add_many (GST_BIN (pipeline), filesrc, decbin, enc, svr, NULL);
 
   /* we link the elements together */
-//  gst_element_link (src, filter);
-  if(!gst_element_link_many (src, filter, enc, svr, NULL))
-  {
-    g_printerr ("Cannot link elements.\n");
-    return -1;            
-  }
+  //  gst_element_link (src, filter);
+  gst_element_link_pads (filesrc, "src", decbin, "sink");
+  g_signal_connect (decbin, "pad-added", G_CALLBACK (cb_new_pad), &data);
+//  if(!gst_element_link_many (decbin, vidconv, enc, svr, NULL))
+//  {
+//    g_printerr ("Cannot link elements.\n");
+//    return -1;            
+//  }
 
   /* we add a message handler */
-  bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
-  gst_bus_add_signal_watch (bus);
-  gst_bus_enable_sync_message_emission (bus);
+//  bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
+//  gst_bus_add_signal_watch (bus);
+//  gst_bus_enable_sync_message_emission (bus);
 //  bus_watch_id = gst_bus_add_watch (bus, bus_call, loop);
 //  g_signal_connect (bus, "message", (GCallback) bus_call, bin);
 //  g_signal_connect (bus, "sync-message", (GCallback) handle_sync_message, &data);
   g_signal_connect (svr, "client-added", (GCallback)sock_added, &data);
   
-
-    /* Initialize our data structure */
-  memset (&data, 0, sizeof (data));
-  data.loop = loop;
-  data.pipeline = pipeline;
-  data.tcp_svr_sink = svr;
-  data.encoder = enc;
-  
+ 
   /* Set the pipeline to "playing" state*/
   g_print ("Now playing: %s\n", argv[1]);
   ret = gst_element_set_state (pipeline, GST_STATE_PLAYING);
@@ -284,7 +323,7 @@ main (int   argc,
 
   g_print ("Deleting pipeline\n");
   gst_object_unref (GST_OBJECT (pipeline));
-  gst_object_unref (bus);
+//  gst_object_unref (bus);
 //  g_source_remove (bus_watch_id);
   g_main_loop_unref (loop);
 
