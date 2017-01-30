@@ -203,7 +203,7 @@ main (int   argc,
     return -1;
   }
   g_object_set (filesrc, "location", "bbb.mp4", NULL);
-  g_object_set (filesrc, "num-buffers", 1800, NULL);  
+  g_object_set (filesrc, "num-buffers", 6000, NULL);  
   
   //create filter
   filter = gst_element_factory_make ("capsfilter", "filter");
@@ -237,7 +237,7 @@ main (int   argc,
     g_printerr ("Cannot create an x264 encoder.\n");
     return -1;
   }  
-  g_object_set (enc, "bitrate", 20, NULL);
+  g_object_set (enc, "bitrate", 512, NULL);
 
   //Create x264 parser
   parser = gst_element_factory_make ("h264parse", "parser");
