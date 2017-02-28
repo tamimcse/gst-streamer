@@ -145,9 +145,9 @@ static gboolean background_task (CustomData *data) {
     int infoLen = sizeof(info);
     getsockopt(fd, 6, TCP_INFO, (void *)&info, (socklen_t *)&infoLen);
 //    uint64_t throughput = info.tcpi_snd_cwnd * info.tcpi_snd_mss * 8 /1024;
-    uint64_t throughput = info.tcpi_delivery_rate * 8 /1024;
+    uint64_t throughput = info.tcpi_feedback_rate * 8;
     FILE* log = fopen("logfile.log", "a");
-    fprintf(log, "throughput = %lu\n", throughput);
+    fprintf(log, "Feedback = %lu kbit\n", throughput);
     fclose(log);
     
     g_object_set (data->encoder, "bitrate", throughput, NULL);
