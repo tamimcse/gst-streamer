@@ -240,7 +240,7 @@ main (int   argc,
     g_printerr ("Cannot create an x264 encoder.\n");
     return -1;
   }  
-  g_object_set (enc, "bitrate", 512, NULL);
+  g_object_set (enc, "bitrate", 340, NULL);
 
   //Create x264 parser
   parser = gst_element_factory_make ("h264parse", "parser");
